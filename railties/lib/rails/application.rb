@@ -7,8 +7,7 @@ require 'active_support/message_verifier'
 require 'rails/engine'
 
 module Rails
-  # In Rails 3.0, a Rails::Application object was introduced which is nothing more than
-  # an Engine but with the responsibility of coordinating the whole boot process.
+  # An Engine with the responsibility of coordinating the whole boot process.
   #
   # == Initialization
   #
@@ -157,21 +156,12 @@ module Rails
       self
     end
 
-    # Implements call according to the Rack API. It simply
-    # dispatches the request to the underlying middleware stack.
-    def call(env)
-      req = ActionDispatch::Request.new env
-      env["ORIGINAL_FULLPATH"] = req.fullpath
-      env["ORIGINAL_SCRIPT_NAME"] = req.script_name
-      super(env)
-    end
-
     # Reload application routes regardless if they changed or not.
     def reload_routes!
       routes_reloader.reload!
     end
 
-    # Return the application's KeyGenerator
+    # Returns the application's KeyGenerator
     def key_generator
       # number of iterations selected based on consultation with the google security
       # team. Details at https://github.com/rails/rails/pull/6952#issuecomment-7661220
@@ -514,6 +504,19 @@ module Rails
           raise "Missing `secret_key_base` for '#{Rails.env}' environment, set this value in `config/secrets.yml`"
         end
       end
+    end
+
+    private
+
+    def build_request(env)
+      req = super
+      env["ORIGINAL_FULLPATH"] = req.fullpath
+      env["ORIGINAL_SCRIPT_NAME"] = req.script_name
+      req
+    end
+
+    def build_middleware
+      config.app_middleware + super
     end
   end
 end

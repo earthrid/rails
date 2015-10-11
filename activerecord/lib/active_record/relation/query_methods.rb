@@ -3,7 +3,6 @@ require "active_record/relation/query_attribute"
 require "active_record/relation/where_clause"
 require "active_record/relation/where_clause_factory"
 require 'active_model/forbidden_attributes_protection'
-require 'active_support/core_ext/string/filters'
 
 module ActiveRecord
   module QueryMethods
@@ -242,18 +241,15 @@ module ActiveRecord
     #   Model.select(:field).first.other_field
     #   # => ActiveModel::MissingAttributeError: missing attribute: other_field
     def select(*fields)
-      if block_given?
-        to_a.select { |*block_args| yield(*block_args) }
-      else
-        raise ArgumentError, 'Call this with at least one field' if fields.empty?
-        spawn._select!(*fields)
-      end
+      return super if block_given?
+      raise ArgumentError, 'Call this with at least one field' if fields.empty?
+      spawn._select!(*fields)
     end
 
     def _select!(*fields) # :nodoc:
       fields.flatten!
       fields.map! do |field|
-        klass.attribute_alias?(field) ? klass.attribute_alias(field) : field
+        klass.attribute_alias?(field) ? klass.attribute_alias(field).to_sym : field
       end
       self.select_values += fields
       self
@@ -267,7 +263,7 @@ module ActiveRecord
     # Returns an array with distinct records based on the +group+ attribute:
     #
     #   User.select([:id, :name])
-    #   => [#<User id: 1, name: "Oscar">, #<User id: 2, name: "Oscar">, #<User id: 3, name: "Foo">
+    #   => [#<User id: 1, name: "Oscar">, #<User id: 2, name: "Oscar">, #<User id: 3, name: "Foo">]
     #
     #   User.group(:name)
     #   => [#<User id: 3, name: "Foo", ...>, #<User id: 2, name: "Oscar", ...>]
@@ -551,7 +547,7 @@ module ActiveRecord
     # If the condition is any blank-ish object, then #where is a no-op and returns
     # the current relation.
     def where(opts = :chain, *rest)
-      if opts == :chain
+      if :chain == opts
         WhereChain.new(spawn)
       elsif opts.blank?
         self
@@ -561,11 +557,8 @@ module ActiveRecord
     end
 
     def where!(opts, *rest) # :nodoc:
-      if Hash === opts
-        opts = sanitize_forbidden_attributes(opts)
-        references!(PredicateBuilder.references(opts))
-      end
-
+      opts = sanitize_forbidden_attributes(opts)
+      references!(PredicateBuilder.references(opts)) if Hash === opts
       self.where_clause += where_clause_factory.build(opts, rest)
       self
     end
@@ -587,7 +580,7 @@ module ActiveRecord
     #
     # The two relations must be structurally compatible: they must be scoping the same model, and
     # they must differ only by +where+ (if no +group+ has been defined) or +having+ (if a +group+ is
-    # present). Neither relation may have a +limit+, +offset+, or +uniq+ set.
+    # present). Neither relation may have a +limit+, +offset+, or +distinct+ set.
     #
     #    Post.where("id = 1").or(Post.where("id = 2"))
     #    # SELECT `posts`.* FROM `posts`  WHERE (('id = 1' OR 'id = 2'))
@@ -622,6 +615,7 @@ module ActiveRecord
     end
 
     def having!(opts, *rest) # :nodoc:
+      opts = sanitize_forbidden_attributes(opts)
       references!(PredicateBuilder.references(opts)) if Hash === opts
 
       self.having_clause += having_clause_factory.build(opts, rest)
@@ -716,7 +710,7 @@ module ActiveRecord
     #
     #   users = User.readonly
     #   users.first.save
-    #   => ActiveRecord::ReadOnlyRecord: ActiveRecord::ReadOnlyRecord
+    #   => ActiveRecord::ReadOnlyRecord: User is marked as readonly
     def readonly(value = true)
       spawn.readonly!(value)
     end
@@ -790,6 +784,7 @@ module ActiveRecord
       spawn.distinct!(value)
     end
     alias uniq distinct
+    deprecate uniq: :distinct
 
     # Like #distinct, but modifies relation in place.
     def distinct!(value = true) # :nodoc:
@@ -797,6 +792,7 @@ module ActiveRecord
       self
     end
     alias uniq! distinct!
+    deprecate uniq!: :distinct!
 
     # Used to extend a scope with additional methods, either through
     # a module or through a block provided.
@@ -999,15 +995,13 @@ module ActiveRecord
     end
 
     def arel_columns(columns)
-      if from_clause.value
-        columns
-      else
-        columns.map do |field|
-          if (Symbol === field || String === field) && columns_hash.key?(field.to_s)
-            arel_table[field]
-          else
-            field
-          end
+      columns.map do |field|
+        if (Symbol === field || String === field) && columns_hash.key?(field.to_s) && !from_clause.value
+          arel_table[field]
+        elsif Symbol === field
+          connection.quote_table_name(field.to_s)
+        else
+          field
         end
       end
     end

@@ -102,10 +102,10 @@ module ActiveModel
   #   person.changes # => {"name" => ["Bill", "Bob"]}
   #
   # If an attribute is modified in-place then make use of
-  # +[attribute_name]_will_change!+ to mark that the attribute is changing.
+  # <tt>[attribute_name]_will_change!</tt> to mark that the attribute is changing.
   # Otherwise \Active \Model can't track changes to in-place attributes. Note
   # that Active Record can detect in-place modifications automatically. You do
-  # not need to call +[attribute_name]_will_change!+ on Active Record models.
+  # not need to call <tt>[attribute_name]_will_change!</tt> on Active Record models.
   #
   #   person.name_will_change!
   #   person.name_change # => ["Bill", "Bill"]
@@ -203,7 +203,7 @@ module ActiveModel
       # Returns +true+ if attr_name were changed before the model was saved,
       # +false+ otherwise.
       def previous_changes_include?(attr_name)
-        @previously_changed.include?(attr_name)
+        previous_changes.include?(attr_name)
       end
 
       # Removes current changes and makes them accessible through +previous_changes+.
@@ -225,7 +225,7 @@ module ActiveModel
 
       # Handles <tt>*_previous_change</tt> for +method_missing+.
       def attribute_previous_change(attr)
-        @previously_changed[attr] if attribute_previously_changed?(attr)
+        previous_changes[attr] if attribute_previously_changed?(attr)
       end
 
       # Handles <tt>*_will_change!</tt> for +method_missing+.

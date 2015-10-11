@@ -26,6 +26,9 @@ class Company < AbstractCompany
   def private_method
     "I am Jack's innermost fears and aspirations"
   end
+
+  class SpecialCo < Company
+  end
 end
 
 module Namespaced
@@ -82,6 +85,9 @@ class Firm < Company
   has_many :unautosaved_accounts, :foreign_key => "firm_id", :class_name => 'Account', :autosave => false
 
   has_many :association_with_references, -> { references(:foo) }, :class_name => 'Client'
+
+  has_one :lead_developer, class_name: "Developer"
+  has_many :projects
 
   def log
     @log ||= []

@@ -96,7 +96,9 @@ class IntegrationTest < ActiveRecord::TestCase
     owner.update_column :updated_at, Time.current
     key = owner.cache_key
 
-    assert pet.touch
+    travel(1.second) do
+      assert pet.touch
+    end
     assert_not_equal key, owner.reload.cache_key
   end
 
@@ -125,6 +127,7 @@ class IntegrationTest < ActiveRecord::TestCase
   end
 
   def test_cache_key_format_is_precise_enough
+    skip("Subsecond precision is not supported") unless subsecond_precision_supported?
     dev = Developer.first
     key = dev.cache_key
     dev.touch

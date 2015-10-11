@@ -58,8 +58,6 @@ class AttributeAssignmentTest < ActiveModel::TestCase
   end
 
   test "assign private attribute" do
-    rubinius_skip "https://github.com/rubinius/rubinius/issues/3328"
-
     model = Model.new
     assert_raises(ActiveModel::UnknownAttributeError) do
       model.assign_attributes(metadata: { a: 1 })
@@ -72,7 +70,7 @@ class AttributeAssignmentTest < ActiveModel::TestCase
     end
   end
 
-  test "an ArgumentError is raised if a non-hash-like obejct is passed" do
+  test "an ArgumentError is raised if a non-hash-like object is passed" do
     assert_raises(ArgumentError) do
       Model.new(1)
     end

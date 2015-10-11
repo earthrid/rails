@@ -148,7 +148,7 @@ module ActiveRecord
     # Attributes marked as readonly are silently ignored if the record is
     # being updated.
     def save!(*args)
-      create_or_update(*args) || raise(RecordNotSaved.new(nil, self))
+      create_or_update(*args) || raise(RecordNotSaved.new("Failed to save the record", self))
     end
 
     # Deletes the record in the database and freezes this instance to
@@ -193,7 +193,7 @@ module ActiveRecord
     # and #destroy! raises ActiveRecord::RecordNotDestroyed.
     # See ActiveRecord::Callbacks for further details.
     def destroy!
-      destroy || raise(ActiveRecord::RecordNotDestroyed, self)
+      destroy || _raise_record_not_destroyed
     end
 
     # Returns an instance of the specified +klass+ with the attributes of the
@@ -211,8 +211,8 @@ module ActiveRecord
     def becomes(klass)
       became = klass.new
       became.instance_variable_set("@attributes", @attributes)
-      changed_attributes = @changed_attributes if defined?(@changed_attributes)
-      became.instance_variable_set("@changed_attributes", changed_attributes || {})
+      became.instance_variable_set("@mutation_tracker", @mutation_tracker) if defined?(@mutation_tracker)
+      became.instance_variable_set("@changed_attributes", attributes_changed_by_setter)
       became.instance_variable_set("@new_record", new_record?)
       became.instance_variable_set("@destroyed", destroyed?)
       became.instance_variable_set("@errors", errors)
@@ -332,16 +332,18 @@ module ActiveRecord
     # Saving is not subjected to validation checks. Returns +true+ if the
     # record could be saved.
     def increment!(attribute, by = 1)
-      increment(attribute, by).update_attribute(attribute, self[attribute])
+      increment(attribute, by)
+      change = public_send(attribute) - (attribute_was(attribute.to_s) || 0)
+      self.class.update_counters(id, attribute => change)
+      clear_attribute_change(attribute) # eww
+      self
     end
 
     # Initializes +attribute+ to zero if +nil+ and subtracts the value passed as +by+ (default is 1).
     # The decrement is performed directly on the underlying attribute, no setter is invoked.
     # Only makes sense for number-based attributes. Returns +self+.
     def decrement(attribute, by = 1)
-      self[attribute] ||= 0
-      self[attribute] -= by
-      self
+      increment(attribute, -by)
     end
 
     # Wrapper around +decrement+ that saves the record. This method differs from
@@ -349,7 +351,7 @@ module ActiveRecord
     # Saving is not subjected to validation checks. Returns +true+ if the
     # record could be saved.
     def decrement!(attribute, by = 1)
-      decrement(attribute, by).update_attribute(attribute, self[attribute])
+      increment!(attribute, -by)
     end
 
     # Assigns to +attribute+ the boolean opposite of <tt>attribute?</tt>. So
@@ -382,7 +384,7 @@ module ActiveRecord
     #   # => #<Account id: 1, email: 'account@example.com'>
     #
     # Attributes are reloaded from the database, and caches busted, in
-    # particular the associations cache.
+    # particular the associations cache and the QueryCache.
     #
     # If the record no longer exists in the database <tt>ActiveRecord::RecordNotFound</tt>
     # is raised. Otherwise, in addition to the in-place modification the method
@@ -418,6 +420,8 @@ module ActiveRecord
     #   end
     #
     def reload(options = nil)
+      self.class.connection.clear_query_cache
+
       fresh_object =
         if options && options[:lock]
           self.class.unscoped { self.class.lock(options[:lock]).find(id) }
@@ -546,6 +550,13 @@ module ActiveRecord
 
     def verify_readonly_attribute(name)
       raise ActiveRecordError, "#{name} is marked as readonly" if self.class.readonly_attributes.include?(name)
+    end
+
+    def _raise_record_not_destroyed
+      @_association_destroy_exception ||= nil
+      raise @_association_destroy_exception || RecordNotDestroyed.new("Failed to destroy the record", self)
+    ensure
+      @_association_destroy_exception = nil
     end
   end
 end

@@ -1,4 +1,123 @@
-*   Encoding ActiveSupport::TimeWithZone to YAML now preserves the timezone information.
+*   `Cache#fetch` instrumentation marks whether it was a `:hit`.
+
+    *Robin Clowers*
+
+*   `assert_difference` and `assert_no_difference` now returns the result of the
+    yielded block.
+
+    Example:
+
+      post = assert_difference -> { Post.count }, 1 do
+        Post.create
+      end
+
+    *Lucas Mazza*
+
+*   Short-circuit `blank?` on date and time values since they are never blank.
+
+    Fixes #21657
+
+    *Andrew White*
+
+*   Replaced deprecated `ThreadSafe::Cache` with its successor `Concurrent::Map` now that
+    the thread_safe gem has been merged into concurrent-ruby.
+
+    *Jerry D'Antonio*
+
+*   Updated Unicode version to 8.0.0
+
+    *Anshul Sharma*
+
+*   `number_to_currency` and `number_with_delimiter` now accept custom `delimiter_pattern` option
+     to handle placement of delimiter, to support currency formats like INR
+
+     Example:
+
+        number_to_currency(1230000, delimiter_pattern: /(\d+?)(?=(\d\d)+(\d)(?!\d))/, unit: '₹', format: "%u %n")
+        # => '₹ 12,30,000.00'
+
+    *Vipul A M*
+
+*   Deprecate `:prefix` option of `number_to_human_size` with no replacement.
+
+    *Jean Boussier*
+
+*   Fix `TimeWithZone#eql?` to properly handle `TimeWithZone` created from `DateTime`:
+        twz = DateTime.now.in_time_zone
+        twz.eql?(twz.dup) => true
+
+    Fixes #14178.
+
+    *Roque Pinel*
+
+*   ActiveSupport::HashWithIndifferentAccess `select` and `reject` will now return
+    enumerator if called without block.
+
+    Fixes #20095
+
+    *Bernard Potocki*
+
+*   Removed `ActiveSupport::Concurrency::Latch`, superseded by `Concurrent::CountDownLatch`
+    from the concurrent-ruby gem.
+
+    *Jerry D'Antonio*
+
+*   Fix not calling `#default` on `HashWithIndifferentAccess#to_hash` when only
+    `default_proc` is set, which could raise.
+
+    *Simon Eskildsen*
+
+*   Fix setting `default_proc` on `HashWithIndifferentAccess#dup`
+
+    *Simon Eskildsen*
+
+*   Fix a range of values for parameters of the Time#change
+
+    *Nikolay Kondratyev*
+
+*   Add `Enumerable#pluck` to get the same values from arrays as from ActiveRecord
+    associations.
+
+    Fixes #20339.
+
+    *Kevin Deisz*
+
+*   Add a bang version to `ActiveSupport::OrderedOptions` get methods which will raise
+    an `KeyError` if the value is `.blank?`
+
+    Before:
+
+        if (slack_url = Rails.application.secrets.slack_url).present?
+          # Do something worthwhile
+        else
+          # Raise as important secret password is not specified
+        end
+
+    After:
+
+        slack_url = Rails.application.secrets.slack_url!
+
+    *Aditya Sanghi*, *Gaurish Sharma*
+
+*   Remove deprecated `Class#superclass_delegating_accessor`.
+    Use `Class#class_attribute` instead.
+
+    *Akshay Vishnoi*
+
+*   Patch `Delegator` to work with `#try`.
+
+    Fixes #5790.
+
+    *Nate Smith*
+
+*   Add `Integer#positive?` and `Integer#negative?` query methods
+    in the vein of `Fixnum#zero?`.
+
+    This makes it nicer to do things like `bunch_of_numbers.select(&:positive?)`.
+
+    *DHH*
+
+*   Encoding `ActiveSupport::TimeWithZone` to YAML now preserves the timezone information.
 
     Fixes #9183.
 
@@ -44,12 +163,12 @@
 
     *Todd Bealmear*
 
-*   Fixed a problem where String#truncate_words would get stuck with a complex
+*   Fixed a problem where `String#truncate_words` would get stuck with a complex
     string.
 
     *Henrik Nygren*
 
-*   Fixed a roundtrip problem with AS::SafeBuffer where primitive-like strings
+*   Fixed a roundtrip problem with `AS::SafeBuffer` where primitive-like strings
     will be dumped as primitives:
 
     Before:
@@ -96,7 +215,7 @@
 
     *Ian Ker-Seymer*
 
-*   Duplicate frozen array when assigning it to a HashWithIndifferentAccess so
+*   Duplicate frozen array when assigning it to a `HashWithIndifferentAccess` so
     that it doesn't raise a `RuntimeError` when calling `map!` on it in `convert_value`.
 
     Fixes #18550.
@@ -125,7 +244,7 @@
 *   Add `#on_weekend?`, `#next_weekday`, `#prev_weekday` methods to `Date`,
     `Time`, and `DateTime`.
 
-    `#on_weekend?` returns true if the receiving date/time falls on a Saturday
+    `#on_weekend?` returns `true` if the receiving date/time falls on a Saturday
     or Sunday.
 
     `#next_weekday` returns a new date/time representing the next day that does
@@ -173,32 +292,26 @@
 
     The preferred method to halt a callback chain from now on is to explicitly
     `throw(:abort)`.
-    In the past, returning `false` in an ActiveSupport callback had the side
-    effect of halting the callback chain. This is not recommended anymore and,
-    depending on the value of
-    `Callbacks::CallbackChain.halt_and_display_warning_on_return_false`, will
-    either not work at all or display a deprecation warning.
+    In the past, callbacks could only be halted by explicitly providing a
+    terminator and by having a callback match the conditions of the terminator.
 
-*   Add Callbacks::CallbackChain.halt_and_display_warning_on_return_false
+*   Add `ActiveSupport.halt_callback_chains_on_return_false`
 
-    Setting `Callbacks::CallbackChain.halt_and_display_warning_on_return_false`
-    to true will let an app support the deprecated way of halting callback
-    chains by returning `false`.
+    Setting `ActiveSupport.halt_callback_chains_on_return_false`
+    to `true` will let an app support the deprecated way of halting Active Record,
+    and Active Model callback chains by returning `false`.
 
-    Setting the value to false will tell the app to ignore any `false` value
-    returned by callbacks, and only halt the chain upon `throw(:abort)`.
-
-    The value can also be set with the Rails configuration option
-    `config.active_support.halt_callback_chains_on_return_false`.
+    Setting the value to `false` will tell the app to ignore any `false` value
+    returned by those callbacks, and only halt the chain upon `throw(:abort)`.
 
     When the configuration option is missing, its value is `true`, so older apps
     ported to Rails 5.0 will not break (but display a deprecation warning).
     For new Rails 5.0 apps, its value is set to `false` in an initializer, so
     these apps will support the new behavior by default.
 
-    *claudiob*
+    *claudiob*, *Roque Pinel*
 
-*   Changes arguments and default value of CallbackChain's :terminator option
+*   Changes arguments and default value of CallbackChain's `:terminator` option
 
     Chains of callbacks defined without an explicit `:terminator` option will
     now be halted as soon as a `before_` callback throws `:abort`.

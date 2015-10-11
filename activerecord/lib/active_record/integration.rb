@@ -15,7 +15,7 @@ module ActiveRecord
       self.cache_timestamp_format = :nsec
     end
 
-    # Returns a String, which Action Pack uses for constructing an URL to this
+    # Returns a String, which Action Pack uses for constructing a URL to this
     # object. The default implementation returns this record's id as a String,
     # or nil if this record's unsaved.
     #
@@ -84,7 +84,7 @@ module ActiveRecord
       # Values longer than 20 characters will be truncated. The value
       # is truncated word by word.
       #
-      #   user = User.find_by(name: 'David HeinemeierHansson')
+      #   user = User.find_by(name: 'David Heinemeier Hansson')
       #   user.id         # => 125
       #   user_path(user) # => "/users/125-david"
       #

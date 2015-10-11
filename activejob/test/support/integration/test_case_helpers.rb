@@ -27,8 +27,8 @@ module TestCaseHelpers
       jobs_manager.clear_jobs
     end
 
-    def adapter_is?(adapter_class_symbol)
-      ActiveJob::Base.queue_adapter.class.name.split("::").last.gsub(/Adapter$/, '').underscore == adapter_class_symbol.to_s
+    def adapter_is?(*adapter_class_symbols)
+      adapter_class_symbols.map(&:to_s).include?(ActiveJob::Base.queue_adapter.class.name.split("::").last.gsub(/Adapter$/, '').underscore)
     end
 
     def wait_for_jobs_to_finish_for(seconds=60)
@@ -42,7 +42,15 @@ module TestCaseHelpers
       end
     end
 
-    def job_executed
-      Dummy::Application.root.join("tmp/#{@id}").exist?
+    def job_executed(id=@id)
+      Dummy::Application.root.join("tmp/#{id}").exist?
+    end
+
+    def job_executed_at(id=@id)
+      File.new(Dummy::Application.root.join("tmp/#{id}")).ctime
+    end
+
+    def job_output
+      File.read Dummy::Application.root.join("tmp/#{@id}")
     end
 end
